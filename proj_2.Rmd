@@ -1,0 +1,189 @@
+---
+title: "When 95% Isn’t 95%: A Monte Carlo Study of Confidence Interval Coverage"
+author: "A.M.Mahin"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: journal
+    toc: true
+    toc_float: true
+    collapse: true
+    toc_depth: 2
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Question
+if you repeatedly sample from skewed distributions, how often does a nominal 95% confidence interval for the mean actually contain the true mean, and how does that change with sample size?
+
+# Initial guess:
+
+* For skewed distributions the interval most of the time still contains the true mean [10.28.2026;13:09]
+
+# Distributions:
+
+* **Normal**(Symmetric)
+
+$$f(x) = \frac{1}{\sigma\sqrt{2\pi}}e^{-\frac{(x-\mu)^2}{2\sigma^2}}\qquad f(x)\sim N(\mu,\sigma^2)$$
+
+* **$\chi^2$-distribution**(Skewed)
+
+$$g(x) = \frac{x^{k/2-1}e^{-x/2}}{2^{k/2}\Gamma(k/2)}\qquad g(x)\sim\chi^2(k)$$
+# SEED: 
+```{r}
+set.seed(67)
+```
+
+
+# Samples
+
+## normal
+```{r}
+l_norm_samp <- rnorm(10000,12,sqrt(24))
+s_norm_samp <- rnorm(30,12,sqrt(24))
+```
+
+## $\chi^2$
+```{r}
+l_chi_samp <- rchisq(10000,12)
+s_chi_samp <- rchisq(30,12)
+```
+
+
+# checks
+## normal
+### large
+```{r}
+cat("length:", length(l_norm_samp),"\n")
+cat("mean:", mean( l_norm_samp),"\n")
+cat("variance:", var(l_norm_samp))
+
+hist(l_norm_samp,
+     col = "lightsalmon",
+     main = "Normal distribution with large sample",
+     ylim = c(0,2000))
+abline(v = mean( l_norm_samp), col = "slateblue", lwd = 2, lty = 2)
+text(x = mean(l_norm_samp) , y = 2000, labels = paste("Mean =", round(mean(l_norm_samp), 2)), col = "darkgreen")
+abline(v = 12, col = "yellow", lwd = 2, lty = 2)
+text(x = 12 , y = 1850, labels = paste("Set Mean =", 12), col = "black")
+```
+
+### small
+```{r}
+cat("length:", length(s_norm_samp),"\n")
+cat("mean:", mean( s_norm_samp),"\n")
+cat("variance:", var(s_norm_samp))
+
+hist(s_norm_samp,
+     col = "tomato",
+     main = "Normal distribution with small sample",
+     ylim = c(0,10))
+abline(v = mean( s_norm_samp), col = "darkblue", lwd = 2, lty = 2)
+text(x = mean(s_norm_samp)+9 , y = 10, labels = paste("Mean =", round(mean(s_norm_samp), 2)), col = "springgreen4")
+abline(v = 12, col = "yellow", lwd = 2, lty = 2)
+text(x = 0 , y = 8, labels = paste("Set Mean =", 12), col = "black")
+```
+
+## $\chi^2$
+### large
+```{r}
+h   <- hist(l_chi_samp, plot = FALSE)
+top <- max(h$counts) * 1.15            # headroom above the tallest bar
+
+plot(h,
+     col  = "lightblue",
+     main = "Chi-square distribution with large sample",
+     ylim = c(0, top))
+abline(v = mean(l_chi_samp), col = "firebrick1", lwd = 2, lty = 2)
+abline(v = 12, col = "yellow", lwd = 2, lty = 2)
+text(x = mean(l_chi_samp), y = top, pos = 4,
+     labels = paste("Mean =", round(mean(l_chi_samp), 2)), col = "darkmagenta")
+text(x = 12, y = top * 0.93, pos = 2,
+     labels = paste("Set Mean =", 12), col = "black")
+
+```
+
+### small
+```{r}
+cat("length:", length(s_chi_samp),"\n")
+cat("mean:", mean( s_chi_samp),"\n")
+cat("variance:", var(s_chi_samp))
+
+hist(s_chi_samp,
+     col = "steelblue1",
+     main = "Chi-square distribution with small sample",
+     ylim = c(0,10))
+abline(v = mean( s_chi_samp), col = "red2", lwd = 2, lty = 2)
+text(x = mean(s_chi_samp)+2 , y = 10, labels = paste("Mean =", round(mean(s_chi_samp), 2)), col = "purple")
+abline(v = 12, col = "yellow", lwd = 2, lty = 2)
+text(x = 9.85 , y = 8.5, labels = paste("Set Mean =", 12), col = "black")
+```
+
+```{r}
+# several small samples: each column is one sample of size n_small
+n_small <- 30
+reps    <- 4
+
+s_norm_mat <- replicate(reps, rnorm(n_small, 12, sqrt(24)))
+s_chi_mat  <- replicate(reps, rchisq(n_small, 12))
+
+dim(s_norm_mat); dim(s_chi_mat)          # check against your prediction
+colMeans(s_norm_mat); apply(s_norm_mat, 2, var)
+colMeans(s_chi_mat);  apply(s_chi_mat, 2, var)
+```
+
+
+```{r}
+# large samples, side by side, same x-axis
+xr <- range(l_norm_samp, l_chi_samp)
+op <- par(mfrow = c(1, 2))
+hist(l_norm_samp, xlim = xr, main = "Normal, large")
+abline(v = 12, lwd = 2, lty = 2)
+hist(l_chi_samp,  xlim = xr, main = "Chi-square, large")
+abline(v = 12, lwd = 2, lty = 2)
+par(op)
+```
+
+
+```{r}
+# small samples: top row normal, bottom row chi-square
+xr_s <- range(s_norm_mat, s_chi_mat)
+op <- par(mfrow = c(2, reps))
+for (j in 1:reps) { hist(s_norm_mat[, j], xlim = xr_s, main = paste("Normal, draw", j)); abline(v = 12, lwd = 2, lty = 2) }
+for (j in 1:reps) { hist(s_chi_mat[, j],  xlim = xr_s, main = paste("Chi-sq, draw", j));  abline(v = 12, lwd = 2, lty = 2) }
+par(op)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
